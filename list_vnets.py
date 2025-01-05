@@ -4,9 +4,11 @@ from azure.identity import AzureCliCredential
 from azure.mgmt.network import NetworkManagementClient
 from azure.mgmt.resource.subscriptions import SubscriptionClient
 from azure.core.exceptions import AzureError, ClientAuthenticationError
+from graphviz import Digraph
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.getLogger('azure').setLevel(logging.WARNING)  # Suppress detailed API call logs
 
 def get_all_subscriptions():
     try:
@@ -26,12 +28,17 @@ def list_vnets(subscription_id, credential):
         network_client = NetworkManagementClient(credential, subscription_id)
         vnet_list = []
         for vnet in network_client.virtual_networks.list_all():
+            peered_vnets = []
+            peerings = network_client.virtual_network_peerings.list(vnet.id.split('/')[4], vnet.name)
+            for peering in peerings:
+                peered_vnets.append(peering.remote_virtual_network.id)
             for address_space in vnet.address_space.address_prefixes:
                 vnet_list.append({
                     "CIDR": address_space,
                     "VNET": vnet.name,
                     "ResourceGroup": vnet.id.split('/')[4],
-                    "SubscriptionId": subscription_id
+                    "SubscriptionId": subscription_id,
+                    "PeeredVNets": peered_vnets
                 })
         logging.info(f"Found {len(vnet_list)} VNets in subscription {subscription_id}.")
         return vnet_list
@@ -46,9 +53,11 @@ def list_vnets(subscription_id, credential):
 def write_to_csv(data, filename):
     try:
         with open(filename, mode="w", newline="") as file:
-            writer = csv.DictWriter(file, fieldnames=["CIDR", "VNET", "ResourceGroup", "SubscriptionId"])
+            writer = csv.DictWriter(file, fieldnames=["CIDR", "VNET", "ResourceGroup", "SubscriptionId", "PeeredVNets"])
             writer.writeheader()
-            writer.writerows(data)
+            for row in data:
+                row["PeeredVNets"] = ";".join(row["PeeredVNets"])  # Convert list to semicolon-separated string
+                writer.writerow(row)
         logging.info(f"Data written to {filename}")
     except IOError as e:
         logging.error(f"Failed to write to CSV file {filename}: {e}")
@@ -68,6 +77,36 @@ def identify_collisions(data):
             collisions.extend(items)
     logging.info(f"Found {len(collisions)} collisions.")
     return sorted(collisions, key=lambda x: x["CIDR"])
+
+def read_csv(filename):
+    try:
+        with open(filename, mode="r") as file:
+            reader = csv.DictReader(file)
+            return [row for row in reader]
+    except IOError as e:
+        logging.error(f"Failed to read CSV file {filename}: {e}")
+        return []
+
+def visualize_peerings(peerings):
+    dot = Digraph(comment="VNet Peering Diagram")
+    dot.attr(size='8.5,11', ratio='fill')
+    dot.attr(dpi='1000')  
+    colors = ["red", "blue", "green", "yellow", "purple", "orange", "brown", "pink", "gray", "cyan"]
+    color_index = 0
+    drawn_connections = set()
+
+    for peering in peerings:
+        source = f"{peering['SourceVNet']} ({peering['SourceCIDR']})"
+        target = f"{peering['TargetVNet']} ({peering['TargetCIDR']})"
+        connection = tuple(sorted([source, target]))
+
+        if connection not in drawn_connections:
+            dot.edge(source, target, color=colors[color_index % len(colors)], dir='both')  # Bidirectional arrow
+            drawn_connections.add(connection)
+            color_index += 1
+
+    dot.render("vnet_peering_diagram", format="png", cleanup=True)
+    logging.info("Diagram saved as vnet_peering_diagram.png")
 
 def main():
     logging.info("Starting the VNet CIDR inspection script...")
@@ -89,6 +128,33 @@ def main():
     # Write collisions to CSV
     logging.info("Writing collisions to CSV...")
     write_to_csv(collisions, "colliding_vnets.csv")
+
+    # Read the CSV file for peerings
+    peerings = read_csv("all_vnets.csv")
+
+    # Prepare peerings data for visualization
+    peerings_data = []
+    for row in peerings:
+        source_vnet = row["VNET"]
+        source_cidr = row["CIDR"]
+        source_rg = row["ResourceGroup"]
+        peered_vnets = row["PeeredVNets"].split(";")
+        for peered_vnet in peered_vnets:
+            peerings_data.append({
+                "SourceVNet": source_vnet,
+                "SourceCIDR": source_cidr,
+                "SourceResourceGroup": source_rg,
+                "TargetVNet": peered_vnet.split("/")[-1],
+                "TargetCIDR": "Unknown",  # CIDR for target VNets is not available in the CSV
+                "PeeringState": "Connected"
+            })
+
+    # Visualize peerings
+    try:
+        visualize_peerings(peerings_data)
+    except Exception as e:
+        logging.error(f"Failed to visualize peerings: {e}")
+
     logging.info("Script execution completed.")
 
 if __name__ == "__main__":
