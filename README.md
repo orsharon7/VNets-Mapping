@@ -33,5 +33,9 @@ export AZURE_LOG_LEVEL=WARNING
 
 ### Run
 ```sh
-python draw_vnets.py
+python list_vnets.py
+```
+or 
+```sh
+python list_vnets.py --skip-fetch
 ```
