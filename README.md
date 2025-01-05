@@ -29,7 +29,7 @@ export AZURE_LOG_LEVEL=WARNING
 2. **Diagram:**
     - `vnet_peering_diagram.png`: Visual representation of VNets and their peerings.
     - Sample image:
-      ![VNet Peering Diagram](vnet_peering_diagram.png)
+      ![VNet Peering Diagram](vnet_peering_diagram_sample.png)
 
 ### Run
 ```sh
