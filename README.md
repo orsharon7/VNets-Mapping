@@ -39,7 +39,7 @@ or
 ```sh
 python list_vnets.py --skip-fetch
 ```
-or
+or (python list_vnets_by_sub.py --subscription-ids <subscription_id_1> <subscription_id_2> <subscription_id_3>)
 ```sh
 python list_vnets_by_sub.py --subscription-ids 12345678-1234-1234-1234-123456789012 23456789-2345-2345-2345-234567890123 34567890-3456-3456-3456-345678901234
 ```
