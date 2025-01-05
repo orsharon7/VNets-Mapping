@@ -86,7 +86,7 @@ def visualize_peerings(peerings):
         connection = tuple(sorted([source, target]))
 
         if connection not in drawn_connections:
-            dot.edge(source, target, label=peering["PeeringState"], color=colors[color_index % len(colors)])
+            dot.edge(source, target, color=colors[color_index % len(colors)], dir='both')  # Bidirectional arrow
             drawn_connections.add(connection)
             color_index += 1
 
