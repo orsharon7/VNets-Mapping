@@ -1,5 +1,6 @@
 import csv
 import logging
+import argparse
 from azure.identity import AzureCliCredential
 from azure.mgmt.network import NetworkManagementClient
 from azure.mgmt.resource.subscriptions import SubscriptionClient
@@ -109,25 +110,30 @@ def visualize_peerings(peerings):
     logging.info("Diagram saved as vnet_peering_diagram.png")
 
 def main():
-    logging.info("Starting the VNet CIDR inspection script...")
-    credential = AzureCliCredential()
-    subscriptions = get_all_subscriptions()
-    all_vnets = []
+    parser = argparse.ArgumentParser(description="VNet CIDR inspection and visualization script.")
+    parser.add_argument('--skip-fetch', action='store_true', help="Skip fetching data and use existing CSV for visualization.")
+    args = parser.parse_args()
 
-    for sub in subscriptions:
-        vnets = list_vnets(sub, credential)
-        all_vnets.extend(vnets)
+    if not args.skip_fetch:
+        logging.info("Starting the VNet CIDR inspection script...")
+        credential = AzureCliCredential()
+        subscriptions = get_all_subscriptions()
+        all_vnets = []
 
-    # Write all VNets to CSV
-    logging.info("Writing all VNets to CSV...")
-    write_to_csv(all_vnets, "all_vnets.csv")
+        for sub in subscriptions:
+            vnets = list_vnets(sub, credential)
+            all_vnets.extend(vnets)
 
-    # Identify collisions
-    collisions = identify_collisions(all_vnets)
+        # Write all VNets to CSV
+        logging.info("Writing all VNets to CSV...")
+        write_to_csv(all_vnets, "all_vnets.csv")
 
-    # Write collisions to CSV
-    logging.info("Writing collisions to CSV...")
-    write_to_csv(collisions, "colliding_vnets.csv")
+        # Identify collisions
+        collisions = identify_collisions(all_vnets)
+
+        # Write collisions to CSV
+        logging.info("Writing collisions to CSV...")
+        write_to_csv(collisions, "colliding_vnets.csv")
 
     # Read the CSV file for peerings
     peerings = read_csv("all_vnets.csv")
