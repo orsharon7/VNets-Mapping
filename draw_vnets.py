@@ -74,16 +74,21 @@ def write_to_csv(data, filename, fieldnames):
 
 def visualize_peerings(peerings):
     dot = Digraph(comment="VNet Peering Diagram")
-    dot.attr(size='11,8.5', ratio='fill')  # Adjust size and ratio for better visualization
-    dot.attr(dpi='1000')  # Set DPI to a lower value to reduce pixelation
+    dot.attr(size='8.5,11', ratio='compress')  # Adjust size and ratio for better visualization
+    dot.attr(dpi='600')  # Set higher DPI for super HD resolution
     colors = ["red", "blue", "green", "yellow", "purple", "orange", "brown", "pink", "gray", "cyan"]
     color_index = 0
+    drawn_connections = set()
 
     for peering in peerings:
         source = f"{peering['SourceVNet']} ({peering['SourceCIDR']})"
         target = f"{peering['TargetVNet']} ({peering['TargetCIDR']})"
-        dot.edge(source, target, label=peering["PeeringState"], color=colors[color_index % len(colors)])
-        color_index += 1
+        connection = tuple(sorted([source, target]))
+
+        if connection not in drawn_connections:
+            dot.edge(source, target, label=peering["PeeringState"], color=colors[color_index % len(colors)])
+            drawn_connections.add(connection)
+            color_index += 1
 
     dot.render("vnet_peering_diagram", format="png", cleanup=True)
     logging.info("Diagram saved as vnet_peering_diagram.png")
